@@ -14,6 +14,15 @@
 #define SSID "SSID"
 #define PASS "PASSWORD"
 
+//Defaults to DHCP, if you want a static IP, uncomment and 
+//configure below
+//#define STATIC_IP
+#ifdef STATIC_IP
+IPAddress ip(192, 168, 0, 50);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 0, 0);
+#endif
+
 #define MQTT_SERVER "192.168.0.1"
 #define MQTT_PORT 1883
 
@@ -40,6 +49,9 @@ void initWifi() {
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(SSID);
+#ifdef STATIC_IP
+  WiFi.config(ip, gateway, subnet);
+#endif
 
   WiFi.begin(SSID, PASS);
   if (WiFi.status() == WL_CONNECTED) {
