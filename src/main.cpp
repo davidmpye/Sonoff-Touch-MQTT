@@ -14,7 +14,7 @@
 #define SSID "SSID"
 #define PASS "PASSWORD"
 
-//Defaults to DHCP, if you want a static IP, uncomment and 
+//Defaults to DHCP, if you want a static IP, uncomment and
 //configure below
 //#define STATIC_IP
 #ifdef STATIC_IP
@@ -36,6 +36,8 @@ const char *statusTopic = "status/" NAME "/light";
 volatile int desiredRelayState = 0;
 volatile int relayState = 0;
 volatile unsigned long millisSinceChange = 0;
+
+unsigned long lastMQTTCheck = 0;
 
 #define BUTTON_PIN 0
 #define RELAY_PIN 12
@@ -160,7 +162,6 @@ void setup() {
   lastMQTTCheck = millis();
 }
 
-unsigned long lastMQTTCheck = 0;
 void loop() {
 
   if (millis() - lastMQTTCheck >= 5000) {
