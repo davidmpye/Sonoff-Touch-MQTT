@@ -33,18 +33,19 @@ const char *cmndTopic1 = "cmnd/" NAME "/light";
 const char *cmndTopic2 = "cmnd/group/lights";
 const char *statusTopic = "status/" NAME "/light";
 
-volatile int desiredRelayState = 0;
-volatile int relayState = 0;
-volatile unsigned long millisSinceChange = 0;
-
-unsigned long lastMQTTCheck = 0;
-
 #define BUTTON_PIN 0
 #define RELAY_PIN 12
 #define LED_PIN 13
 
+volatile int desiredRelayState = 0;
+volatile int relayState = 0;
+volatile unsigned long millisSinceChange = 0;
+
+unsigned long lastMQTTCheck = -5000; //This will force an immediate check on init.
+
 WiFiClient espClient;
 PubSubClient client(espClient);
+bool printedWifiToSerial = false;
 
 void initWifi() {
   // We start by connecting to a WiFi network
@@ -56,34 +57,32 @@ void initWifi() {
 #endif
 
   WiFi.begin(SSID, PASS);
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("WiFi connected");
-    Serial.println("IP address: ");
-    Serial.println(WiFi.localIP());
-  }
-  else Serial.println("WiFi not connected...");
 }
 
 void checkMQTTConnection() {
-  Serial.print("Establishing MQTT connection: ");
-  if (WiFi.status() == WL_CONNECTED && !client.connected()) {
-    if (client.connect(NAME)) {
-      Serial.println("connected");
-      client.subscribe(cmndTopic1);
-      client.subscribe(cmndTopic2);
-    } else {
-      Serial.print("failed, rc=");
-      Serial.println(client.state());
+  Serial.print("Checking MQTT connection: ");
+  if (client.connected()) Serial.println("OK");
+  else {
+    if (WiFi.status() == WL_CONNECTED) {
+      //Wifi connected, attempt to connect to server
+      Serial.print("new connection: ");
+      if (client.connect(NAME)) {
+        Serial.println("connected");
+        client.subscribe(cmndTopic1);
+        client.subscribe(cmndTopic2);
+      } else {
+        Serial.print("failed, rc=");
+        Serial.println(client.state());
+      }
+    }
+    else {
+      //Wifi isn't connected, so no point in trying now.
+      Serial.println(" Not connected to WiFI AP, abandoned connect.");
     }
   }
-  if (client.connected()) {
-    //LED to on.
-    digitalWrite(LED_PIN, LOW);
-    return;
-  }
-  else {
-    digitalWrite(LED_PIN, HIGH);
-  }
+  //Set the status LED to ON if we are connected to the MQTT server
+  if (client.connected()) digitalWrite(LED_PIN, LOW);
+    else digitalWrite(LED_PIN, HIGH);
 }
 
 void MQTTcallback(char* topic, byte* payload, unsigned int length) {
@@ -133,6 +132,8 @@ void buttonChangeCallback() {
 }
 
 void setup() {
+  Serial.begin(115200);
+  Serial.println("Initialising");
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -141,7 +142,6 @@ void setup() {
   digitalWrite(LED_PIN, HIGH); //LED off.
 
   Serial.begin(115200);
-  Serial.println("Init");
   initWifi();
 
   client.setServer(MQTT_SERVER, MQTT_PORT);
@@ -154,30 +154,44 @@ void setup() {
   ArduinoOTA.begin();
   //Enable interrupt for button press
 
-  Serial.println("Enabling switch interrupt");
+  Serial.println("Enabling touch switch interrupt");
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonChangeCallback, CHANGE);
-
-  //Connect to MQTT server.
-  checkMQTTConnection();
-  lastMQTTCheck = millis();
 }
 
 void loop() {
+  //If we haven't printed WiFi details to Serial port yet, and WiFi now connected,
+  //do so now. (just the once)
+  if (!printedWifiToSerial && WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    printedWifiToSerial = true;
+  }
 
   if (millis() - lastMQTTCheck >= 5000) {
     checkMQTTConnection();
     lastMQTTCheck = millis();
   }
 
-  client.loop(); //Process MQTT client events
+  //Handle any pending MQTT messages
+  client.loop();
 
-  //Handler for over-the-air SW updates.
+  //Handle any pending OTA SW updates
   ArduinoOTA.handle();
 
-  //Relay state is updated via the interrupt above *OR* the MQTT callback.
+  //Relay state is updated via the interrupt *OR* the MQTT callback.
   if (relayState != desiredRelayState) {
+      Serial.print("Changing state to ");
+      Serial.println(desiredRelayState);
+
       digitalWrite(RELAY_PIN, desiredRelayState);
       relayState = desiredRelayState;
+
+      Serial.print("Sending MQTT status update ");
+      Serial.print(relayState);
+      Serial.print(" to ");
+      Serial.println(statusTopic);
+
       client.publish(statusTopic, relayState == 0 ? "0" : "1");
   }
   delay(50);
