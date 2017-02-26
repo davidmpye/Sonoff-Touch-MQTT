@@ -91,13 +91,13 @@ void MQTTcallback(char* topic, byte* payload, unsigned int length) {
   Serial.println("] ");
 
   if (!strcmp(topic, cmndTopic1) || !strcmp(topic, cmndTopic2)) {
-    if ((char)payload[0] == '1' || ! strcasecmp((char *)payload, "on")) {
+    if ((char)payload[0] == '1' || ! strncasecmp_P((char *)payload, "on", length)) {
         desiredRelayState = 1;
     }
-    else if ((char)payload[0] == '0' || ! strcasecmp((char *)payload, "off")) {
+    else if ((char)payload[0] == '0' || ! strncasecmp_P((char *)payload, "off", length)) {
       desiredRelayState = 0;
     }
-    else if ( ! strcasecmp((char *)payload, "toggle")) {
+    else if ( ! strncasecmp_P((char *)payload, "toggle", length)) {
       desiredRelayState = !desiredRelayState;
     }
   }
