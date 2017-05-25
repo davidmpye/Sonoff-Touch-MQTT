@@ -141,7 +141,6 @@ void setup() {
 
   digitalWrite(LED_PIN, HIGH); //LED off.
 
-  Serial.begin(115200);
   initWifi();
 
   client.setServer(MQTT_SERVER, MQTT_PORT);
