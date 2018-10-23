@@ -2,7 +2,7 @@
 
 Firmware for the Sonoff Touch capacitive light switch (based on the ESP8265 microncontroller)
 
-###Features:
+### Features:
 
 1. MQTT support - control your light remotely
 2. Single/Group topic
